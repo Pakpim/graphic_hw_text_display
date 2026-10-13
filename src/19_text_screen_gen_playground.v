@@ -23,6 +23,7 @@ module text_screen_gen(
     input wire [11:0] gamepad_in,
     input wire [9:0] x,
     input wire [9:0] y,
+    input wire vsync,
     output reg [5:0] rgb
     );
     
@@ -94,13 +95,14 @@ module text_screen_gen(
             pix_x2_reg <= pix_x1_reg;
             pix_y1_reg <= y;
             pix_y2_reg <= pix_y1_reg;
-            // update state
-            if (delay_color == 0) begin
-              delay_color <= 640*480*100;
-            end
-            else delay_color <= delay_color - 1;
         end
 		
+    always @(posedge vsync) begin
+      if (delay_color == 0) begin
+        delay_color <= 50;
+      end 
+      else delay_color <= delay_color -1;
+    end
 
     // tile RAM write
     assign addr_w = {cur_y_reg, cur_x_reg};
@@ -108,10 +110,11 @@ module text_screen_gen(
     assign din = 7'd1;
 
     assign addr_w2 = (gamepad_in[3]) ? {cur_y_reg, cur_x_reg} : {y[8:4], x[9:3]};
-    assign we2 = gamepad_in[3] | (delay_color < 640*480 && x[2:0]==6 && y[3:0] == 1
+    assign we2 = gamepad_in[3] | (delay_color == 50 && x[2:0]==3'b111 && y[3:0] == 4'b1111
                                   && pix_x1_reg[9:3]==x[9:3] && pix_y1_reg[8:4]==y[8:4]);
-    // assign din2 = 6'b111111;
-    assign din2 = (dout2 == 6'b000000 || dout2 == 6'b110000) ? 6'b000011:
+
+    assign din2 = (gamepad_in[3]) ? 6'b000011:
+                  (dout2 == 6'b000000 || dout2 == 6'b110000) ? 6'b000011:
                   (dout2 == 6'b000011) ? 6'b001100:
                   (dout2 == 6'b001100) ? 6'b110000: 6'b111111;
 

@@ -69,7 +69,7 @@ module tt_um_vga_example(
 
     // instantiate text generation circuit
     text_screen_gen tsg(.clk(clk), .reset(~rst_n), .video_off(~video_active), 
-                        .gamepad_in(gamepad_in), .x(pix_x), .y(pix_y), .rgb(color));
+                        .gamepad_in(gamepad_in), .x(pix_x), .y(pix_y), .vsync(vsync), .rgb(color));
 
     assign R = (video_active)? color[5:4]:0;
     assign G = (video_active)? color[3:2]:0;
