@@ -83,18 +83,22 @@ module text_screen_gen(
     // parameter bar_u = 24, bar_d = 30, bar_l = 52, bar_r = 64;
 
     // brush ascii
-    reg [6:0] selected_ascii = 7'b1;
-    reg [6:0] ascii_palatte[7][2];
-    wire [2:0] ascii_index_i;
-    wire ascii_index_j;
-    wire on_ascii_palatte;
-    wire cursor_on_ascii;
-    wire cursor_in_ascii_palatte;
-    parameter ascii_l = 72, ascii_r = 80, ascii_u = 2, ascii_d = 16;
+    // reg [6:0] selected_ascii = 7'b1;
+    // reg [6:0] ascii_palatte[7][2];
+    // wire [2:0] ascii_index_i;
+    // wire ascii_index_j;
+    // wire on_ascii_palatte;
+    // wire cursor_on_ascii;
+    // wire cursor_in_ascii_palatte;
+    // parameter ascii_l = 72, ascii_r = 80, ascii_u = 2, ascii_d = 16;
 
     // pen
     reg pen_down = 0;
     reg prev_b = 0;
+    reg [4:0] pen_size = 1;
+    wire pen_on;
+    wire [5:0] pen_rgb;
+    reg prev_x = 0, prev_y = 0;
 
     // move speed based on cursor position
     wire [8:0] move_speed_x;
@@ -118,16 +122,20 @@ module text_screen_gen(
      
     initial begin
       for (integer i=0;i<8;i=i+1) begin
-        color_palatte[i][0] = (i%2==0) ? 6'b001111: 6'b111100;
-        color_palatte[i][1] = (i%2==0) ? 6'b001011: 6'b111000;
+        color_palatte[i][0] = (i&1)*(6'b000011) + (i>>1&1)*(6'b001100) + (i>>2&1)*(6'b110000);
       end
-      ascii_palatte[0][0] = 7'h01;
-      ascii_palatte[0][1] = 7'h58;
-      ascii_palatte[1][0] = 7'h2e;
-      ascii_palatte[1][1] = 7'h7f;
-      for (integer i=0;i<10;i=i+1) begin
-        ascii_palatte[i/2 + 2][i&1] = 7'h30 + i;
+      for (integer i=0;i<8;i=i+1) begin
+        integer j=(i+3)%8;
+        color_palatte[i][1] = (i&1)*(6'b000010) + (i>>1&1)*(6'b001000) + (i>>2&1)*(6'b100000)
+                            + (j&1)*(6'b010000) + (j>>1&1)*(6'b000001) + (j>>2&1)*(6'b000100);
       end
+      // ascii_palatte[0][0] = 7'h01;
+      // ascii_palatte[0][1] = 7'h58;
+      // ascii_palatte[1][0] = 7'h2e;
+      // ascii_palatte[1][1] = 7'h7f;
+      // for (integer i=0;i<10;i=i+1) begin
+      //   ascii_palatte[i/2 + 2][i&1] = 7'h30 + i;
+      // end
     end
 
 
@@ -162,6 +170,19 @@ module text_screen_gen(
               if (!prev_b) pen_down <= pen_down ^ 1;
             end
             else prev_b <= 0;
+
+            if (gamepad_in[10]) begin
+              prev_y <= 1;
+              if (!prev_y) pen_size <= (pen_size>0)? pen_size - 1:0;
+            end
+            else prev_y <= 0;
+
+            if (gamepad_in[2]) begin
+              prev_x <= 1;
+              if (!prev_x) pen_size <= (pen_size<10)? pen_size + 1:10;
+            end
+            else prev_x <= 0;
+
         end
 		
     always @(posedge vsync) begin
@@ -181,17 +202,25 @@ module text_screen_gen(
     assign cursor_in_color_box = (cur_y_reg >= palatte_u && cur_y_reg < palatte_d &&
                                   cur_x_reg >= 0 && cur_x_reg < 8);
 
-    assign on_ascii_palatte = (pix_y2_reg[8:4] >= ascii_u && pix_y2_reg[8:4] < ascii_d &&
-                               pix_x2_reg[9:3] >= ascii_l && pix_x2_reg[9:3] < ascii_r);
-    assign ascii_index_j = (pix_x2_reg[9:3]-ascii_l)>>2;
-    assign ascii_index_i = (pix_y2_reg[8:4]-ascii_u)>>1;
-    assign cursor_on_ascii = (cur_y_reg[4:1] == pix_y2_reg[8:5] && cur_x_reg[6:2]==pix_x2_reg[9:5] && on_ascii_palatte);
-    assign cursor_in_ascii_palatte = (cur_y_reg >= ascii_u && cur_y_reg < ascii_d &&
-                                      cur_x_reg >= ascii_l && cur_x_reg < ascii_r);
+    // assign on_ascii_palatte = (pix_y2_reg[8:4] >= ascii_u && pix_y2_reg[8:4] < ascii_d &&
+    //                            pix_x2_reg[9:3] >= ascii_l && pix_x2_reg[9:3] < ascii_r);
+    // assign ascii_index_j = (pix_x2_reg[9:3]-ascii_l)>>2;
+    // assign ascii_index_i = (pix_y2_reg[8:4]-ascii_u)>>1;
+    // assign cursor_on_ascii = (cur_y_reg[4:1] == pix_y2_reg[8:5] && cur_x_reg[6:2]==pix_x2_reg[9:5] && on_ascii_palatte);
+    // assign cursor_in_ascii_palatte = (cur_y_reg >= ascii_u && cur_y_reg < ascii_d &&
+    //                                   cur_x_reg >= ascii_l && cur_x_reg < ascii_r);
   
+    // pen
+    assign pen_on = ((cur_y_reg < pen_size) ? pix_y2_reg[8:4] + pen_size >= cur_y_reg : pix_y2_reg[8:4] >= cur_y_reg - pen_size) &&
+                    ((pix_y2_reg[8:4] < pen_size) ? pix_y2_reg[8:4] <= cur_y_reg + pen_size : pix_y2_reg[8:4] - pen_size <= cur_y_reg) &&
+                    (pix_x2_reg[9:3] + pen_size >= cur_x_reg) &&
+                    (pix_x2_reg[9:3] <= cur_x_reg + pen_size);
+    assign pen_rgb = selected_color * ((pix_x2_reg&1) ^ (pix_y2_reg&1));
+
     // tile RAM write
-    assign addr_w = {cur_y_reg, cur_x_reg};
-    assign we = pen_down;
+    assign addr_w = {pix_y2_reg[8:4],pix_x2_reg[9:3]};
+    // assign addr_w = {cur_y_reg, cur_x_reg};
+    assign we = pen_down && pen_on;
     assign din = 7'd1;
 
     // test rom
@@ -238,7 +267,7 @@ module text_screen_gen(
     // green over black and reversed video for cursor
     
 
-    assign text_rgb = (ascii_bit) ? ((dout2!=0) ? dout2 : 6'b001100) : 6'b0;
+    assign text_rgb = (ascii_bit) ? dout2: 6'b0;
     assign text_rev_rgb = (ascii_bit) ? 6'b0 : selected_color;
     // use delayed coordinates for comparison
     assign cursor_on = (pix_y2_reg[8:4] == cur_y_reg) &&
@@ -258,6 +287,8 @@ module text_screen_gen(
               else rgb = color_palatte[palatte_index_i][palatte_index_j];
             else if(cursor_on)
               rgb = text_rev_rgb;
+            else if (pen_on)
+              rgb = pen_rgb;
             else
               rgb = text_rgb;
     end
